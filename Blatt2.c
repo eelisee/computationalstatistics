@@ -75,7 +75,7 @@ double skalarprodukt_berechnen(int n, double *x, double *y) {
 }
 
 int main() {
-    int n = 1000000;
+    int n = 10;
     double *x = malloc(n * sizeof(double)); // Vektor x
     double *y = malloc(n * sizeof(double)); // Vektor y
 
