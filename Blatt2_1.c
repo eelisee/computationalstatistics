@@ -93,3 +93,8 @@ Faktor 16: Time for loop 3: 0.002202 seconds; 0,01s user 0,01s system 9% cpu 0,1
 
 -> funroll nicht effektiv bei bereits unrolled loops e.g. Faktor 16. 
 */
+
+
+/*
+Kann man auch mit M(i) machen?
+*/
