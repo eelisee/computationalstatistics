@@ -1,4 +1,4 @@
-#include "scalar.h"
+#include "scalar.h" // lokale Header Datei
 
 double scalar_standard(double *a, double *b, int n) {
     double sum = 0.0;
