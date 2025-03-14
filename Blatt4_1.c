@@ -1,52 +1,14 @@
 #include <stdio.h>
-#include <immintrin.h> // SSE, AVX für x86_64
-#include <arm_neon.h>  // NEON für ARM
+#include <time.h>
+#include <stdlib.h>
+#if defined(__ARM_NEON)
+    #include <arm_neon.h>  // NEON für Apple Silicon
+#elif defined(__x86_64__) || defined(_M_X64)
+    #include <immintrin.h> // SSE/AVX für x86_64
+#endif
 
-
-/*
-Optimierung mit SIMD
-Statt jede Multiplikation einzeln durchzuführen, haben wir SIMD (Single Instruction, Multiple Data) genutzt. Das bedeutet, dass wir mehrere Werte gleichzeitig berechnen, um Zeit zu sparen.
-
-Fused Multiply-Add (FMA)
-FMA kombiniert Multiplikation und Addition in einer einzigen Operation, wodurch sich die Präzision verbessert und die Berechnung schneller wird.
-
-Architektur-spezifische Optimierung
-Da unterschiedliche Prozessoren verschiedene Befehlssätze unterstützen, haben wir drei Varianten geschrieben:
-	•	SSE (ältere Intel/AMD-Prozessoren)
-	•	AVX (neuere Intel/AMD-Prozessoren)
-	•	NEON (für ARM-Prozessoren, z. B. in Smartphones)
-
-*/
-
-
-// Skalarprodukt mit SSE (x86_64)
-float dot_product_sse(const float* a, const float* b, size_t n) {
-    __m128 sum = _mm_setzero_ps();
-    for (size_t i = 0; i < n; i += 4) {
-        __m128 va = _mm_loadu_ps(&a[i]);
-        __m128 vb = _mm_loadu_ps(&b[i]);
-        sum = _mm_fmadd_ps(va, vb, sum);
-    }
-    float result[4];
-    _mm_storeu_ps(result, sum);
-    return result[0] + result[1] + result[2] + result[3];
-}
-
-// Skalarprodukt mit AVX (x86_64)
-float dot_product_avx(const float* a, const float* b, size_t n) {
-    __m256 sum = _mm256_setzero_ps();
-    for (size_t i = 0; i < n; i += 8) {
-        __m256 va = _mm256_loadu_ps(&a[i]);
-        __m256 vb = _mm256_loadu_ps(&b[i]);
-        sum = _mm256_fmadd_ps(va, vb, sum);
-    }
-    float result[8];
-    _mm256_storeu_ps(result, sum);
-    return result[0] + result[1] + result[2] + result[3] +
-           result[4] + result[5] + result[6] + result[7];
-}
-
-// Skalarprodukt mit NEON (ARM)
+// Skalarprodukt mit NEON (für Apple Silicon)
+#if defined(__ARM_NEON)
 float dot_product_neon(const float* a, const float* b, size_t n) {
     float32x4_t sum = vdupq_n_f32(0.0f);
     for (size_t i = 0; i < n; i += 4) {
@@ -58,17 +20,31 @@ float dot_product_neon(const float* a, const float* b, size_t n) {
     vst1q_f32(result, sum);
     return result[0] + result[1] + result[2] + result[3];
 }
+#endif
 
-// Wrapper-Funktion zur Auswahl der passenden Implementierung
+// Skalarprodukt mit SSE (für x86_64)
+#if defined(__x86_64__) || defined(_M_X64)
+float dot_product_sse(const float* a, const float* b, size_t n) {
+    __m128 sum = _mm_setzero_ps();
+    for (size_t i = 0; i < n; i += 4) {
+        __m128 va = _mm_loadu_ps(&a[i]);
+        __m128 vb = _mm_loadu_ps(&b[i]);
+        sum = _mm_fmadd_ps(va, vb, sum);
+    }
+    float result[4];
+    _mm_storeu_ps(result, sum);
+    return result[0] + result[1] + result[2] + result[3];
+}
+#endif
+
+// Architekturabhängige Auswahl
 float dot_product(const float* a, const float* b, size_t n) {
-#if defined(__AVX__)
-    return dot_product_avx(a, b, n);
-#elif defined(__SSE__)
-    return dot_product_sse(a, b, n);
-#elif defined(__ARM_NEON)
+#if defined(__ARM_NEON)
     return dot_product_neon(a, b, n);
+#elif defined(__x86_64__) || defined(_M_X64)
+    return dot_product_sse(a, b, n);
 #else
-    // Falls keine SIMD-Optimierung möglich ist, verwende eine naive Implementierung
+    // Fallback für nicht SIMD-fähige CPUs
     float sum = 0.0f;
     for (size_t i = 0; i < n; ++i) {
         sum += a[i] * b[i];
@@ -78,11 +54,31 @@ float dot_product(const float* a, const float* b, size_t n) {
 }
 
 int main() {
-    float a[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
-    float b[] = {8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
-    size_t n = 8;
+
+    // speicher reservieren
+
+    #define N 40000  // Konstantendefinition für C
+    float a[N];
+    float b[N];
     
-    float result = dot_product(a, b, n);
+    // Initialize arrays
+    for (size_t i = 0; i < N; ++i) {
+        a[i] =  2.0; //(float)(i + 1);
+        b[i] = 1.0f;
+    }
+    
+    clock_t start = clock();
+    float result = dot_product(a, b, N);
+    clock_t end = clock();
+    
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    
     printf("Skalarprodukt: %f\n", result);
+    printf("Zeit: %f Sekunden\n", time_spent);
+    
     return 0;
 }
+
+// gcc -o Blatt4_1 Blatt4_1.c -march=native
+
+// ./Blatt4_1
